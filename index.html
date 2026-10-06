@@ -1,0 +1,366 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Slow Horse or Fast Cart</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rye&family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: one column. Poll recap and verdict, the race (canvas) with controls, then two charts side by side that wrap on phones. */
+:root{
+  --bg:#f3f2ec; --panel:#ffffff; --fg:#23251f; --muted:#62655a; --line:#d9d8cc; --grid:#e6e5db;
+  --road:#4a4c4f; --dirt:#c9b48a; --grass:#a9c38a; --paint:#f6f3e6;
+  --horse:#eb6834; --cart:#2a78d6; --crash:#c62f2f; --accent:#7a4a1c; --accent-ink:#ffffff;
+  --f-display:"Rye", Georgia, "Times New Roman", serif;
+  --f-body:"Atkinson Hyperlegible", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-mono:"JetBrains Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#161714; --panel:#1f201c; --fg:#ebe9df; --muted:#a3a597; --line:#36382f; --grid:#2c2e27;
+  --road:#2f3133; --dirt:#6e5f43; --grass:#3d5230; --paint:#d8d4c2;
+  --horse:#d95926; --cart:#3987e5; --crash:#e05252; --accent:#e0a35a; --accent-ink:#161714; color-scheme:dark }}
+:root[data-theme="dark"]{
+  --bg:#161714; --panel:#1f201c; --fg:#ebe9df; --muted:#a3a597; --line:#36382f; --grid:#2c2e27;
+  --road:#2f3133; --dirt:#6e5f43; --grass:#3d5230; --paint:#d8d4c2;
+  --horse:#d95926; --cart:#3987e5; --crash:#e05252; --accent:#e0a35a; --accent-ink:#161714; color-scheme:dark }
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:15px;line-height:1.5}
+.wrap{max-width:1000px;margin:0 auto;padding-inline:16px;padding-block:20px 48px;display:grid;gap:20px}
+h1{font-family:var(--f-display);font-weight:400;font-size:clamp(28px,5vw,44px);line-height:1.1;margin:0;text-wrap:balance}
+h2{font-family:var(--f-display);font-weight:400;font-size:20px;margin:0}
+.eyebrow{font-family:var(--f-mono);font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+header{display:grid;gap:10px}
+.poll{display:grid;gap:6px;max-width:620px}
+.bar{display:grid;grid-template-columns:150px 1fr 72px;align-items:center;gap:10px;font-family:var(--f-mono);font-size:13px}
+.bar .track{height:14px;background:var(--line);border-radius:2px;overflow:hidden}
+.bar .fill{display:block;height:100%}
+.verdict{font-size:18px;max-width:62ch;margin:0}
+.verdict b{color:var(--accent)}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:6px;overflow:hidden}
+canvas{display:block;width:100%;height:230px}
+.readout{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px 24px;padding:12px 16px;border-top:1px solid var(--line);font-family:var(--f-mono);font-size:13px;font-variant-numeric:tabular-nums}
+.readout .big{font-size:20px;font-weight:600}
+.readout .what{grid-column:1/-1;font-family:var(--f-body);font-size:14px;color:var(--muted)}
+.k-horse{color:var(--horse)} .k-cart{color:var(--cart)}
+.controls{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:16px;padding:16px;border-top:1px solid var(--line)}
+.ctl{display:grid;gap:6px;min-width:0;align-content:start}
+.ctl label,.ctl .lbl{font-family:var(--f-mono);font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.quote{font-size:13px;color:var(--muted);margin:0;min-height:2.6em}
+select,input[type=range]{width:100%;accent-color:var(--accent)}
+select{font:inherit;padding:8px;border:1px solid var(--line);border-radius:4px;background:var(--bg);color:var(--fg)}
+.seg{display:flex;gap:6px;flex-wrap:wrap}
+.seg button{flex:1 1 auto;font:inherit;font-size:14px;padding:8px 10px;border:1px solid var(--line);background:var(--bg);color:var(--fg);border-radius:4px;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center;padding:0 16px 16px}
+.btn{font-family:var(--f-display);font-size:17px;padding:9px 22px;border:0;border-radius:4px;background:var(--accent);color:var(--accent-ink);cursor:pointer}
+.note{font-size:13px;color:var(--muted);margin:0;max-width:70ch}
+button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.charts{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px}
+.chart{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:16px;display:grid;gap:8px;min-width:0;position:relative}
+.chart h3{margin:0;font-size:15px}
+.legend{display:flex;gap:16px;font-size:13px;color:var(--muted)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.legend i{display:inline-block;width:14px;height:3px;border-radius:2px}
+svg{display:block;width:100%;height:auto;overflow:visible}
+svg text{font-family:var(--f-mono);font-size:11px;fill:var(--muted)}
+svg .lab{font-family:var(--f-body);font-size:12px;font-weight:700}
+.tip{position:absolute;pointer-events:none;background:var(--fg);color:var(--bg);font-family:var(--f-mono);font-size:12px;padding:6px 8px;border-radius:4px;white-space:nowrap;font-variant-numeric:tabular-nums}
+details{font-size:14px;color:var(--muted)}
+details summary{cursor:pointer;font-family:var(--f-mono);font-size:12px;letter-spacing:.06em;text-transform:uppercase}
+details ul{padding-left:18px;max-width:72ch}
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">#cx-team-random · QOTD · Tue Oct 6</div>
+    <h1>Would you rather ride a slow horse or a fast cart you can't fully steer?</h1>
+    <div class="poll" aria-label="Poll results">
+      <div class="bar"><span>slow horse</span><span class="track"><span class="fill" style="width:33%;background:var(--horse)"></span></span><span>33% (4)</span></div>
+      <div class="bar"><span>fast cart</span><span class="track"><span class="fill" style="width:67%;background:var(--cart)"></span></span><span>67% (8)</span></div>
+    </div>
+    <p class="verdict" id="verdict"></p>
+  </header>
+
+  <section class="panel" aria-label="Race">
+    <canvas id="cv" aria-label="Top-down view of the horse on the bridle path and the cart on the street"></canvas>
+    <div class="readout" aria-live="polite">
+      <div><div class="eyebrow">Horse</div><span class="big k-horse" id="rHorse">–</span></div>
+      <div><div class="eyebrow">Cart</div><span class="big k-cart" id="rCart">–</span></div>
+      <div><div class="eyebrow">Crashes</div><span class="big" id="rCrash">–</span></div>
+      <div><div class="eyebrow">Concussions</div><span class="big" id="rConc">–</span></div>
+      <div class="what" id="rWhat"></div>
+    </div>
+    <div class="controls">
+      <div class="ctl">
+        <label for="rider">Rider</label>
+        <select id="rider"></select>
+        <p class="quote" id="quote"></p>
+      </div>
+      <div class="ctl">
+        <span class="lbl">Trip</span>
+        <div class="seg" id="trip" role="group" aria-label="Trip">
+          <button type="button" data-d="0.4" aria-pressed="false">Coffee 0.4 km</button>
+          <button type="button" data-d="1.2" aria-pressed="true">Lunch 1.2 km</button>
+          <button type="button" data-d="3" aria-pressed="false">Groceries 3 km</button>
+          <button type="button" data-d="12" aria-pressed="false">Commute 12 km</button>
+        </div>
+      </div>
+      <div class="ctl">
+        <label for="steer">Steering <span id="steerV"></span></label>
+        <input type="range" id="steer" min="50" max="97" value="85">
+        <label for="budget">Concussions you can spare <span id="budgetV"></span></label>
+        <input type="range" id="budget" min="0" max="5" value="2">
+      </div>
+    </div>
+    <div class="actions">
+      <button class="btn" id="go" type="button">Race</button>
+      <span class="note">Clock runs fast. Red marks are crashes.</span>
+    </div>
+  </section>
+
+  <section class="charts" aria-label="Charts">
+    <div class="chart" id="chA">
+      <h3>Minutes to get there</h3>
+      <div class="legend"><span><i style="background:var(--horse)"></i>Horse</span><span><i style="background:var(--cart)"></i>Cart, trips that arrive</span></div>
+      <svg id="svgA" viewBox="0 0 440 260" role="img" aria-label="Line chart of travel minutes by trip distance"></svg>
+    </div>
+    <div class="chart" id="chB">
+      <h3>Chance you arrive</h3>
+      <div class="legend"><span><i style="background:var(--horse)"></i>Horse</span><span><i style="background:var(--cart)"></i>Cart</span></div>
+      <svg id="svgB" viewBox="0 0 440 260" role="img" aria-label="Line chart of the chance of arriving without exceeding your concussion budget, by trip distance"></svg>
+    </div>
+  </section>
+
+  <details>
+    <summary>How the race works</summary>
+    <ul>
+      <li><b>Horse</b>: walking pace, 1.4 m/s (Rose's ruling). It loves you, so it never throws you. About 12 minutes per km.</li>
+      <li><b>Cart</b>: 13.4 m/s, about 30 mph. The street throws 20 hazards per km at it (curbs, potholes, parked cars, turns). Steering is the share you dodge. Every miss is a crash that costs 45 seconds to collect yourself and the cart.</li>
+      <li>Each crash has a 15% chance of a concussion. Go over your spare concussions and the trip ends at urgent care. The horse always arrives.</li>
+      <li>Crashes follow a Poisson process, so the charts are exact, not sampled. The race above is one random draw.</li>
+      <li>Rider settings are guesses from the thread. Nobody has ridden either yet.</li>
+    </ul>
+  </details>
+</div>
+
+<script>
+(() => {
+const VH = 1.4, VC = 13.4, HAZ = 20, PC = 0.15, REC = 45, VANG = 1.5;
+const RIDERS = [
+  {id:'avg', name:'Average CX specialist', steer:85, budget:2, quote:'Baseline. Average luck, average skull.'},
+  {id:'doug', name:'Doug (too many concussions)', steer:85, budget:0, quote:'"I\'ve had too many concussions to risk the shopping cart"'},
+  {id:'vang', name:'Vang (would rather walk)', steer:85, budget:2, quote:'"If it\'s an extremely slow horse... my assumption is that I\'d walk faster than the horse."'},
+  {id:'megan', name:'Megan (cortisol skyrocketing)', steer:72, budget:2, quote:'"my cortisol is skyrocketing thinking about either one"'},
+  {id:'wolfgang', name:'Wolfgang (the horse loves him)', steer:85, budget:2, quote:'"does the horse like me?" Rose: "yes he loves you." Wolfgang: "Then we ride."'},
+];
+const $ = id => document.getElementById(id);
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const st = {d:1.2, anim:null};
+RIDERS.forEach(r => { const o = document.createElement('option'); o.value = r.id; o.textContent = r.name; $('rider').appendChild(o); });
+const rider = () => RIDERS.find(r => r.id === $('rider').value);
+const steer = () => +$('steer').value/100, budget = () => +$('budget').value;
+
+// ---------- exact model ----------
+const crashRate = s => HAZ*(1-s);                 // crashes per km
+function pois(m, k){ let p = Math.exp(-m), c = p; for (let i = 1; i <= k; i++){ p *= m/i; c += p; } return c; }
+function model(d, s, b){
+  const lam = crashRate(s)*d, mc = lam*PC, mn = lam*(1-PC);
+  let num = 0, den = 0, p = Math.exp(-mc);
+  for (let k = 0; k <= b; k++){ if (k) p *= mc/k; num += k*p; den += p; }
+  const ek = den > 0 ? num/den : 0;
+  return {pArrive: den, cartMin: (d*1000/VC + REC*(mn + ek))/60, horseMin: d*1000/VH/60, crashes: lam};
+}
+function crossover(s, b){ // distance where P(arrive) = 50%
+  let lo = 0, hi = 200;
+  for (let i = 0; i < 60; i++){ const m = (lo+hi)/2; if (model(m, s, b).pArrive > 0.5) lo = m; else hi = m; }
+  return lo;
+}
+
+// ---------- verdict ----------
+function verdict(){
+  const s = steer(), b = budget(), x = crossover(s, b), who = rider().name.split(' (')[0];
+  const trips = [['the coffee run',0.4],['lunch',1.2],['groceries',3],['the commute',12]];
+  const cartWins = trips.filter(([,d]) => model(d,s,b).pArrive > 0.5).map(t => t[0]);
+  const xs = x < 10 ? x.toFixed(1) : Math.round(x);
+  $('verdict').innerHTML = `For ${who}, <b>the horse wins any trip longer than ${xs} km</b>. Past that, the cart is more likely to end at urgent care than at the destination. ` +
+    (cartWins.length ? `The cart still takes ${cartWins.join(cartWins.length > 2 ? ', ' : ' and ').replace(/, ([^,]*)$/, ', and $1')}.` : `The cart doesn't take a single trip on the list.`);
+}
+
+// ---------- charts ----------
+const CH = {w:440, h:260, l:44, r:70, t:12, b:34}, XMAX = 15;
+function chart(svgId, series, yMax, yFmt, yTicks, extra){
+  const svg = $(svgId), W = CH.w - CH.l - CH.r, H = CH.h - CH.t - CH.b;
+  const X = d => CH.l + d/XMAX*W, Y = v => CH.t + H - v/yMax*H;
+  let g = '';
+  yTicks.forEach(v => { g += `<line x1="${CH.l}" x2="${CH.l+W}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--grid)" stroke-width="1"/><text x="${CH.l-6}" y="${Y(v)+4}" text-anchor="end">${yFmt(v)}</text>`; });
+  [0,3,6,9,12,15].forEach(d => { g += `<text x="${X(d)}" y="${CH.t+H+18}" text-anchor="middle">${d}</text>`; });
+  g += `<text x="${CH.l+W}" y="${CH.t+H+32}" text-anchor="end">trip distance, km</text>`;
+  g += `<line x1="${CH.l}" x2="${CH.l+W}" y1="${CH.t+H}" y2="${CH.t+H}" stroke="var(--muted)" stroke-width="1"/>`;
+  if (extra) g += extra(X, Y, H);
+  series.forEach(sr => {
+    const pts = []; for (let d = 0; d <= XMAX + 1e-9; d += 0.05) pts.push([d, Math.min(sr.f(d), yMax)]);
+    g += `<polyline fill="none" stroke="var(${sr.color})" stroke-width="2" stroke-linejoin="round" points="${pts.map(([d,v]) => `${X(d).toFixed(1)},${Y(v).toFixed(1)}`).join(' ')}"/>`;
+    const end = pts[pts.length-1];
+    g += `<circle cx="${X(end[0])}" cy="${Y(end[1])}" r="4" fill="var(${sr.color})" stroke="var(--panel)" stroke-width="2"/>`;
+    g += `<text class="lab" x="${X(end[0])+8}" y="${Y(end[1])+4 + (sr.nudge||0)}" style="fill:var(--fg)">${sr.label}</text>`;
+  });
+  g += `<line class="xh" x1="0" x2="0" y1="${CH.t}" y2="${CH.t+H}" stroke="var(--muted)" stroke-width="1" stroke-dasharray="3 3" visibility="hidden"/>`;
+  series.forEach((sr,i) => { g += `<circle class="hd${i}" r="5" fill="var(${sr.color})" stroke="var(--panel)" stroke-width="2" visibility="hidden"/>`; });
+  g += `<rect x="${CH.l}" y="${CH.t}" width="${W}" height="${H}" fill="transparent" class="hit"/>`;
+  svg.innerHTML = g;
+  const box = svg.parentElement; let tip = box.querySelector('.tip');
+  if (!tip){ tip = document.createElement('div'); tip.className = 'tip'; tip.hidden = true; box.appendChild(tip); }
+  const hit = svg.querySelector('.hit'), xh = svg.querySelector('.xh');
+  const move = ev => {
+    const r = svg.getBoundingClientRect(), sx = (ev.clientX - r.left)/r.width*CH.w;
+    const d = Math.max(0, Math.min(XMAX, (sx - CH.l)/W*XMAX));
+    xh.setAttribute('x1', X(d)); xh.setAttribute('x2', X(d)); xh.setAttribute('visibility','visible');
+    const lines = [`${d.toFixed(1)} km`];
+    series.forEach((sr,i) => { const v = sr.f(d), c = svg.querySelector('.hd'+i); c.setAttribute('cx', X(d)); c.setAttribute('cy', Y(Math.min(v,yMax))); c.setAttribute('visibility','visible'); lines.push(`${sr.label}: ${sr.tip(v)}`); });
+    tip.textContent = ''; lines.forEach((t,i) => { if (i) tip.appendChild(document.createElement('br')); tip.appendChild(document.createTextNode(t)); });
+    tip.hidden = false;
+    const br = box.getBoundingClientRect(), px = ev.clientX - br.left;
+    tip.style.left = Math.min(px + 12, br.width - tip.offsetWidth - 8) + 'px'; tip.style.top = (ev.clientY - br.top - tip.offsetHeight - 10) + 'px';
+  };
+  const leave = () => { xh.setAttribute('visibility','hidden'); series.forEach((_,i) => svg.querySelector('.hd'+i).setAttribute('visibility','hidden')); tip.hidden = true; };
+  hit.addEventListener('pointermove', move); hit.addEventListener('pointerleave', leave);
+}
+function drawCharts(){
+  const s = steer(), b = budget();
+  const hMax = XMAX*1000/VH/60;
+  chart('svgA', [
+    {label:'Horse', color:'--horse', f: d => model(d,s,b).horseMin, tip: v => `${v.toFixed(0)} min`},
+    {label:'Cart', color:'--cart', f: d => model(d,s,b).cartMin, tip: v => `${v.toFixed(0)} min`},
+  ], Math.ceil(hMax/30)*30, v => v, [0,30,60,90,120,150,180]);
+  const x = crossover(s, b);
+  chart('svgB', [
+    {label:'Horse', color:'--horse', f: () => 1, tip: () => '100%', nudge:-4},
+    {label:'Cart', color:'--cart', f: d => model(d,s,b).pArrive, tip: v => `${(v*100).toFixed(v < 0.01 ? 2 : 0)}%`},
+  ], 1, v => Math.round(v*100)+'%', [0,.25,.5,.75,1], (X, Y) => x <= XMAX
+    ? `<line x1="${X(x)}" x2="${X(x)}" y1="${Y(1)}" y2="${Y(0)}" stroke="var(--fg)" stroke-width="1" stroke-dasharray="2 4"/><text x="${X(x)+5}" y="${Y(0.5)-6}" style="fill:var(--fg)">horse wins past ${x < 10 ? x.toFixed(1) : Math.round(x)} km</text>` : '');
+}
+
+// ---------- race ----------
+function sampleRace(d, s, b){
+  const meters = d*1000, rate = crashRate(s)/1000, crashes = []; let pos = 0, conc = 0, ended = false;
+  while (true){
+    pos += -Math.log(1 - Math.random())/rate;
+    if (pos >= meters) break;
+    const isConc = Math.random() < PC; if (isConc) conc++;
+    const rec = REC*(0.6 + Math.random()*0.8);
+    crashes.push({pos, rec, conc:isConc});
+    if (conc > b){ ended = true; break; }
+  }
+  // timeline
+  const segs = []; let t = 0, p = 0;
+  crashes.forEach(c => { const dt = (c.pos - p)/VC; segs.push({t0:t, t1:t+dt, p0:p, p1:c.pos}); t += dt; segs.push({t0:t, t1:t+c.rec, p0:c.pos, p1:c.pos, crash:c}); t += c.rec; p = c.pos; });
+  if (!ended){ const dt = (meters - p)/VC; segs.push({t0:t, t1:t+dt, p0:p, p1:meters}); t += dt; }
+  return {meters, crashes, conc, ended, cartT: t, horseT: meters/VH, segs, dodged: Math.round(HAZ*d*s)};
+}
+function cartAt(r, t){
+  for (const s of r.segs){ if (t <= s.t1){ const f = s.t1 > s.t0 ? (t - s.t0)/(s.t1 - s.t0) : 1; return {p: s.p0 + (s.p1 - s.p0)*f, crash: s.crash ? (t - s.t0) : null}; } }
+  return {p: r.ended ? r.segs[r.segs.length-1].p1 : r.meters, crash: null, done:true};
+}
+const fmtT = s => s < 60 ? `${Math.round(s)} s` : s < 3600 ? `${Math.floor(s/60)}:${String(Math.round(s%60)).padStart(2,'0')}` : `${Math.floor(s/3600)} h ${Math.round((s%3600)/60)} m`;
+
+const cv = $('cv'), ctx = cv.getContext('2d'); let W = 0, H = 0;
+function resize(){ const dpr = devicePixelRatio || 1, r = cv.getBoundingClientRect(); W = r.width; H = r.height; cv.width = W*dpr; cv.height = H*dpr; ctx.setTransform(dpr,0,0,dpr,0,0); if (st.race) drawRace(st.race, st.t); }
+let obstacles = [];
+function drawRace(r, t){
+  if (!W) return;
+  const L = 50, R = W - 40, X = m => L + m/r.meters*(R - L);
+  ctx.fillStyle = css('--grass'); ctx.fillRect(0,0,W,H);
+  const hy = H*0.27, cy = H*0.68;
+  ctx.fillStyle = css('--dirt'); ctx.fillRect(0, hy-16, W, 32);
+  ctx.fillStyle = css('--road'); ctx.fillRect(0, cy-38, W, 76);
+  ctx.strokeStyle = css('--paint'); ctx.lineWidth = 2; ctx.setLineDash([14,12]); ctx.beginPath(); ctx.moveTo(0, cy); ctx.lineTo(W, cy); ctx.stroke(); ctx.setLineDash([]);
+  // start / finish
+  ctx.fillStyle = css('--paint'); ctx.fillRect(X(0)-2, hy-22, 3, H*0.68+38-hy+22);
+  for (let i = 0; i < 8; i++){ ctx.fillStyle = i % 2 ? css('--fg') : css('--paint'); ctx.fillRect(X(r.meters)-3, hy-22 + i*((cy+38-hy+22)/8), 6, (cy+38-hy+22)/8); }
+  ctx.font = '11px ' + css('--f-mono'); ctx.fillStyle = css('--paint'); ctx.textAlign = 'left';
+  ctx.fillText('bridle path', 8, hy - 20); ctx.fillText('street', 8, cy - 42);
+  // obstacles dodged (grey) and crash marks (red)
+  obstacles.forEach(o => { ctx.fillStyle = css('--paint'); ctx.globalAlpha = .55; ctx.fillRect(X(o.pos)-3, cy + o.lane*22 - 3, 6, 6); ctx.globalAlpha = 1; });
+  const c = cartAt(r, t);
+  r.crashes.forEach(k => { if (k.pos <= c.p + 0.5){ ctx.strokeStyle = css('--crash'); ctx.lineWidth = 2.5; const x = X(k.pos); ctx.beginPath(); ctx.moveTo(x-6, cy+18); ctx.lineTo(x+6, cy+30); ctx.moveTo(x+6, cy+18); ctx.lineTo(x-6, cy+30); ctx.stroke(); } });
+  // horse
+  const hp = Math.min(r.meters, t*VH), hx = X(hp);
+  drawHorse(hx, hy, t);
+  // cart
+  const wob = c.crash !== null ? 0 : Math.sin(t*3.1)*10 + Math.sin(t*7.7)*5;
+  drawCart(X(c.p), cy + 14 + wob*0.6, c.crash);
+}
+function drawHorse(x, y, t){
+  const col = css('--horse'); ctx.fillStyle = col; ctx.strokeStyle = col; ctx.lineWidth = 3; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.ellipse(x-6, y, 14, 7, 0, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(x+6, y-2); ctx.lineTo(x+14, y-9); ctx.stroke();
+  ctx.beginPath(); ctx.ellipse(x+17, y-10, 6, 3.5, -0.4, 0, Math.PI*2); ctx.fill();
+  const sw = Math.sin(t*2.2)*3;
+  ctx.lineWidth = 2.5; [[-16,sw],[-10,-sw],[0,sw],[4,-sw]].forEach(([dx,s]) => { ctx.beginPath(); ctx.moveTo(x+dx, y+4); ctx.lineTo(x+dx+s, y+13); ctx.stroke(); });
+  ctx.beginPath(); ctx.moveTo(x-20, y-2); ctx.quadraticCurveTo(x-28, y+2, x-25, y+10); ctx.stroke();
+  ctx.fillStyle = css('--crash'); ctx.beginPath(); ctx.moveTo(x-4, y-14); ctx.bezierCurveTo(x-9,y-20,x-14,y-13,x-4,y-7); ctx.bezierCurveTo(x+6,y-13,x+1,y-20,x-4,y-14); ctx.fill();
+}
+function drawCart(x, y, crashT){
+  ctx.save(); ctx.translate(x, y);
+  if (crashT !== null) ctx.rotate(Math.min(crashT, 1.2)*2.2);
+  const col = css('--cart'); ctx.strokeStyle = col; ctx.lineWidth = 2.5; ctx.lineJoin = 'round';
+  ctx.beginPath(); ctx.moveTo(-16,-12); ctx.lineTo(14,-12); ctx.lineTo(10,4); ctx.lineTo(-12,4); ctx.closePath(); ctx.stroke();
+  ctx.beginPath(); for (let i = -10; i <= 8; i += 6){ ctx.moveTo(i,-12); ctx.lineTo(i+(i/10),4); } ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(-16,-12); ctx.lineTo(-22,-18); ctx.stroke();
+  ctx.fillStyle = col; [[-9,9],[7,9]].forEach(([a,b]) => { ctx.beginPath(); ctx.arc(a,b,3,0,Math.PI*2); ctx.fill(); });
+  ctx.restore();
+  if (crashT !== null){
+    ctx.fillStyle = css('--crash'); ctx.font = 'bold 12px ' + css('--f-mono'); ctx.textAlign = 'center';
+    ctx.fillText('* * *', x, y - 26 - Math.sin(crashT*6)*2);
+  }
+}
+function showResult(r){
+  const s = steer(), b = budget();
+  $('rHorse').textContent = fmtT(r.horseT);
+  $('rCart').textContent = r.ended ? 'urgent care' : fmtT(r.cartT);
+  $('rCrash').textContent = r.crashes.length;
+  $('rConc').textContent = r.conc;
+  const who = rider().name.split(' (')[0];
+  let msg;
+  if (r.ended) msg = `${who} took concussion number ${r.conc} at ${(r.crashes[r.crashes.length-1].pos/1000).toFixed(2)} km, over the limit of ${b}. The horse arrived in ${fmtT(r.horseT)}. Slow and steady.`;
+  else msg = `The cart got there ${fmtT(r.horseT - r.cartT)} ahead of the horse after dodging ${r.dodged} hazards and hitting ${r.crashes.length}.`;
+  if (rider().id === 'vang') msg += ` Vang on foot would beat the horse by ${fmtT(r.meters/VH - r.meters/VANG)}.`;
+  if (rider().id === 'wolfgang' && r.ended) msg += ' The horse waited outside urgent care because it loves him.';
+  $('rWhat').textContent = msg;
+}
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+function race(animate){
+  if (st.anim) cancelAnimationFrame(st.anim);
+  const r = sampleRace(st.d, steer(), budget()); st.race = r;
+  obstacles = []; const n = Math.min(80, r.dodged); for (let i = 0; i < n; i++) obstacles.push({pos: Math.random()*r.meters, lane: Math.random() < .5 ? -1 : 0.4});
+  const end = Math.max(r.horseT, r.cartT);
+  const finish = () => { st.t = end; drawRace(r, end); showResult(r); };
+  if (!animate || reduce){ finish(); return; }
+  ['rHorse','rCart','rCrash','rConc'].forEach(i => $(i).textContent = '…'); $('rWhat').textContent = '';
+  const dur = 9000, t0 = performance.now();
+  // ease the clock so the cart's part is watchable: first 45% of real time covers the cart's run
+  const split = Math.min(r.cartT, end), tf = u => u < .45 ? (u/.45)*split : split + ((u-.45)/.55)*(end - split);
+  const tick = now => { const u = Math.min(1, (now - t0)/dur); st.t = tf(u); drawRace(r, st.t); if (u < 1) st.anim = requestAnimationFrame(tick); else finish(); };
+  st.anim = requestAnimationFrame(tick);
+}
+
+// ---------- wiring ----------
+function syncLabels(){
+  $('steerV').textContent = `${$('steer').value}% dodged`;
+  const b = budget(); $('budgetV').textContent = b === 0 ? '0 (any concussion ends it)' : String(b);
+  $('quote').textContent = rider().quote;
+}
+function refresh(){ syncLabels(); verdict(); drawCharts(); }
+$('rider').addEventListener('change', () => { const r = rider(); $('steer').value = r.steer; $('budget').value = r.budget; refresh(); race(false); });
+$('steer').addEventListener('input', refresh);
+$('budget').addEventListener('input', refresh);
+$('trip').querySelectorAll('button').forEach(bt => bt.addEventListener('click', () => {
+  $('trip').querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x === bt ? 'true' : 'false'));
+  st.d = +bt.dataset.d; race(true);
+}));
+$('go').addEventListener('click', () => race(true));
+refresh();
+new ResizeObserver(resize).observe(cv);
+race(false);
+})();
+</script>
+
+</html>
